@@ -342,7 +342,7 @@
 					"FB_SONARKIT_ENABLED=1",
 				);
 				INFOPLIST_FILE = VNB4TOEIC/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ";;;;";
+				INFOPLIST_KEY_CFBundleDisplayName = "Vocabulary Notebook for TOEIC ";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -375,7 +375,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = ALQEFZ23LN;
 				INFOPLIST_FILE = VNB4TOEIC/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = ";;;;";
+				INFOPLIST_KEY_CFBundleDisplayName = "Vocabulary Notebook for TOEIC ";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
