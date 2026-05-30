@@ -4,6 +4,7 @@
     "slug": "vnb4-toeic",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "vnb4toeic",
     "userInterfaceStyle": "automatic",
     "plugins": ["expo-router", "expo-secure-store"],
