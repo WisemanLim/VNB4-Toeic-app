@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "VNB4 TOEIC",
+    "slug": "vnb4-toeic",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "vnb4toeic",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": { "typedRoutes": true },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.vnb4.toeic"
+    },
+    "android": {
+      "package": "io.vnb4.toeic",
+      "adaptiveIcon": { "backgroundColor": "#ffffff" }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "apiUrl": "http://localhost:4000"
+    }
+  }
+}

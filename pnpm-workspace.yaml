@@ -1,0 +1,6 @@
+# pnpm 11+ settings. Single-package project. See https://pnpm.io/settings
+#
+# 알려진 native deps (expo-modules-core, sharp, fsevents, esbuild, msgpackr-extract,
+# unrs-resolver, ...) 의 install/postinstall 을 모두 허용.
+# Expo SDK + RN 생태계 표준 deps 이므로 dev 환경 안전. 새 dep 추가 시 신뢰 검토 후 lockfile 반영.
+dangerouslyAllowAllBuilds: true
