@@ -102,6 +102,19 @@ export default function Home() {
         </Pressable>
       </Link>
 
+      <Link href="/bookmarks" asChild>
+        <Pressable style={StyleSheet.flatten([styles.card, styles.bookmarkCard])}>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>🔖</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>북마크 모아보기</Text>
+            <Text style={styles.cardDesc}>저장한 단어·문장 한눈에 보기</Text>
+          </View>
+          <Text style={styles.cardArrow}>›</Text>
+        </Pressable>
+      </Link>
+
       <Text style={styles.sectionTitle}>LC · 듣기</Text>
       <View style={styles.grid}>
         {LC_PARTS.map((p) => (
@@ -222,6 +235,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
   },
   reviewCard: { backgroundColor: colors.accent },
+  bookmarkCard: { backgroundColor: colors.accent2 },
   badge: {
     width: 40,
     height: 40,

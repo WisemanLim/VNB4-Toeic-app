@@ -1,14 +1,22 @@
-import { View, Text, Pressable, StyleSheet, Image, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  Image,
+  ScrollView,
+  PanResponder,
+} from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useLearnQueue, useGradeWord } from "@/core/queries";
 import { useTts } from "@/features/learn/useTts";
-import { Loading, EmptyView, ErrorView } from "@/ui";
+import { Loading, EmptyView, ErrorView, PrimaryButton } from "@/ui";
 import { colors, radius, spacing, fontSize } from "@/theme";
+import { useBookmarks } from "@/store/bookmarks";
+import { useLearnProgress } from "@/store/learnProgress";
 
-// pos is free-form from the backend; map known values (incl. abbreviations) to
-// Korean, fall back to the raw string for anything unmapped.
 const POS_KO: Record<string, string> = {
   noun: "명사",
   verb: "동사",
@@ -31,16 +39,13 @@ const POS_KO: Record<string, string> = {
 };
 const posLabel = (pos?: string | null) => (pos ? (POS_KO[pos] ?? pos) : "");
 
-// Backend words often have no imageUrl; fall back to a deterministic illustration
-// (same scheme as the offline mock) so the card always shows an image.
+// loremflickr returns keyword-relevant Flickr images (better than picsum for vocab).
 const wordImage = (word: string, imageUrl?: string | null) =>
-  imageUrl || `https://picsum.photos/seed/toeic-${encodeURIComponent(word)}/640/420`;
+  imageUrl || `https://loremflickr.com/640/420/${encodeURIComponent(word)}`;
 
-// SRS grade mapped to the simple toolbar: next = 알아요(4), delete = 모르겠어요(1).
 const GRADE_KNOWN = 4;
 const GRADE_UNKNOWN = 1;
 
-/** Renders an example sentence with the target word bolded. */
 function ExampleSentence({ text, word }: { text: string; word: string }) {
   const parts = text.split(new RegExp(`(${word})`, "ig"));
   return (
@@ -61,40 +66,61 @@ function ExampleSentence({ text, word }: { text: string; word: string }) {
 export default function LearnScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const insets = useSafeAreaInsets();
-  const [idx, setIdx] = useState(0);
   const [reveal, setReveal] = useState(false);
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const { play } = useTts();
+
+  // Persisted across navigation (in-memory zustand store).
+  const idx = useLearnProgress((s) => s.indices[lessonId] ?? 0);
+  const setIdx = useLearnProgress((s) => s.setIdx);
+
+  const toggleWord = useBookmarks((s) => s.toggleWord);
+  const hasWord = useBookmarks((s) => s.hasWord);
 
   const { data, isLoading, isError, error, refetch } = useLearnQueue(lessonId);
   const grade = useGradeWord();
 
+  // Hide meaning when the word changes.
+  useEffect(() => {
+    setReveal(false);
+  }, [idx]);
+
+  // Use refs so PanResponder (created once) always calls the latest handlers.
+  const fnRef = useRef({ advance: (_g: number) => {}, goPrev: () => {} });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderRelease: (_, g) => {
+        if (g.dx < -60) fnRef.current.advance(GRADE_KNOWN);
+        else if (g.dx > 60) fnRef.current.goPrev();
+      },
+    }),
+  ).current;
+
   function advance(g: number) {
-    if (!data) return;
+    if (!data || grade.isPending || idx >= data.length) return;
     grade.mutate(
       { wordId: data[idx].wordId, grade: g },
       {
         onSuccess: () => {
-          setReveal(false);
-          setIdx((i) => i + 1);
+          const cur = useLearnProgress.getState().indices[lessonId] ?? 0;
+          setIdx(lessonId, cur + 1);
         },
       },
     );
   }
 
   function goPrev() {
-    setReveal(false);
-    setIdx((i) => Math.max(0, i - 1));
+    setIdx(lessonId, Math.max(0, (useLearnProgress.getState().indices[lessonId] ?? 0) - 1));
   }
 
-  function toggleFavorite(wordId: string) {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(wordId)) next.delete(wordId);
-      else next.add(wordId);
-      return next;
-    });
+  function restart() {
+    setIdx(lessonId, 0);
   }
+
+  // Keep ref current every render.
+  fnRef.current = { advance, goPrev };
 
   if (isLoading) return <Loading />;
   if (isError) {
@@ -106,15 +132,24 @@ export default function LearnScreen() {
     );
   }
   if (!data?.length) return <EmptyView message="학습할 단어가 없습니다." />;
-  if (idx >= data.length) return <EmptyView message="완료! 🎉" />;
+
+  if (idx >= data.length) {
+    return (
+      <View style={styles.doneContainer}>
+        <Text style={styles.doneEmoji}>🎉</Text>
+        <Text style={styles.doneText}>학습 완료!</Text>
+        <PrimaryButton label="다시 시작" onPress={restart} style={{ marginTop: spacing.xl }} />
+      </View>
+    );
+  }
 
   const cur = data[idx].word;
   const wordId = data[idx].wordId;
   const usAudio = cur.audio.find((a) => a.locale === "en_US")?.url ?? cur.audio[0]?.url;
-  const isFav = favorites.has(wordId);
+  const isFav = hasWord(wordId);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...panResponder.panHandlers}>
       <Text style={styles.progress}>
         {idx + 1} / {data.length}
       </Text>
@@ -162,9 +197,7 @@ export default function LearnScreen() {
             {reveal ? (
               <>
                 <Text style={styles.meaning}>{cur.meaningKo}</Text>
-                {cur.exampleEn && (
-                  <View style={styles.divider} />
-                )}
+                {cur.exampleEn && <View style={styles.divider} />}
                 {cur.exampleEn && (
                   <View style={styles.exampleRow}>
                     <View style={{ flex: 1 }}>
@@ -186,6 +219,8 @@ export default function LearnScreen() {
             )}
           </View>
         </Pressable>
+
+        <Text style={styles.swipeHint}>← 알아요  |  모르겠어요 →</Text>
       </ScrollView>
 
       <View style={[styles.toolbar, { paddingBottom: insets.bottom + spacing.md }]}>
@@ -205,7 +240,7 @@ export default function LearnScreen() {
           <Text style={styles.midIcon}>🗑</Text>
         </Pressable>
 
-        <Pressable style={styles.midBtn} onPress={() => toggleFavorite(wordId)}>
+        <Pressable style={styles.midBtn} onPress={() => toggleWord(cur)}>
           <Text style={styles.midIcon}>{isFav ? "🔖" : "🏷"}</Text>
         </Pressable>
 
@@ -221,7 +256,6 @@ export default function LearnScreen() {
   );
 }
 
-// Light card palette (reference uses a light card on the dark app background).
 const CARD = "#ffffff";
 const INK = "#0f172a";
 const INK_MUTED = "#64748b";
@@ -229,6 +263,15 @@ const LINE = "#e2e8f0";
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  doneContainer: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.xl,
+  },
+  doneEmoji: { fontSize: 56 },
+  doneText: { color: colors.text, fontSize: fontSize.xl, fontWeight: "700", marginTop: spacing.md },
   progress: {
     color: colors.textMuted,
     fontSize: fontSize.sm,
@@ -289,6 +332,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: INK_MUTED,
     fontSize: fontSize.base,
+  },
+  swipeHint: {
+    marginTop: spacing.md,
+    textAlign: "center",
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
   },
   toolbar: {
     flexDirection: "row",

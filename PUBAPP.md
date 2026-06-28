@@ -324,6 +324,7 @@ JS/에셋 변경은 스토어 심사 없이 즉시 반영. 단, **네이티브 �
 | iOS "Missing compliance" | 수출 규정 미응답 | App Store Connect 빌드 → Export Compliance → "No"(암호화 미사용) 선택 |
 | iOS 빌드 "No bundle identifier" | App ID 미등록 | A-2 재확인 |
 | Android 16KB 경고 | RN 0.74 미정렬 .so | 출시엔 문제없음. Play 16KB 강제 전까지 OK. 추후 RN 업그레이드 |
+| 실기기에서 발음/쉐도잉 오디오 무음 | iOS 무음(벨소리/진동) 스위치가 켜져 있어 기본적으로 재생 차단 | 코드에서 해결됨 — `useTts` (`src/features/learn/useTts.ts`) 가 마운트 시 `Audio.setAudioModeAsync({ playsInSilentModeIOS: true, shouldDuckAndroid: true })` 호출로 무음 스위치 ON 에서도 재생 |
 
 ---
 

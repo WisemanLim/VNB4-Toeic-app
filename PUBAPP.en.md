@@ -328,6 +328,7 @@ added permissions, SDK upgrades) require `eas build` + resubmission.
 | iOS "Missing compliance" | Export regulations not answered | App Store Connect build → Export Compliance → select "No" (no encryption used) |
 | iOS build "No bundle identifier" | App ID not registered | Re-check A-2 |
 | Android 16KB warning | RN 0.74 unaligned .so | No problem for release. OK until Play enforces 16KB. Upgrade RN later |
+| Pronunciation/shadowing audio silent on a real device | The iOS hardware mute (ring/silent) switch is on, which blocks playback by default | Fixed in code — `useTts` (`src/features/learn/useTts.ts`) calls `Audio.setAudioModeAsync({ playsInSilentModeIOS: true, shouldDuckAndroid: true })` on mount so audio plays even with the mute switch ON |
 
 ---
 

@@ -3,8 +3,9 @@ import { useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { useSentences } from "@/core/queries";
 import { useTts } from "@/features/learn/useTts";
-import { Loading, EmptyView, ErrorView, PrimaryButton } from "@/ui";
+import { Loading, EmptyView, ErrorView } from "@/ui";
 import { colors, radius, spacing, fontSize } from "@/theme";
+import { useBookmarks } from "@/store/bookmarks";
 import type { SentenceItem } from "@/core/schemas";
 
 const norm = (t: string) => t.toLowerCase().replace(/[.,?!]/g, "").trim();
@@ -12,7 +13,6 @@ const norm = (t: string) => t.toLowerCase().replace(/[.,?!]/g, "").trim();
 const tts = (text: string) =>
   `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${encodeURIComponent(text)}`;
 
-/** Deterministic shuffle (seeded by item id) so chips don't reshuffle on re-render. */
 function shuffle<T>(arr: T[], seedStr: string): T[] {
   let seed = 0;
   for (const c of seedStr) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
@@ -25,7 +25,6 @@ function shuffle<T>(arr: T[], seedStr: string): T[] {
   return a;
 }
 
-/** Build word-pick choices: answer tokens + distractors sampled from other items. */
 function buildChoices(item: SentenceItem, pool: string[]): string[] {
   const answer = item.tokens;
   const answerSet = new Set(answer.map(norm));
@@ -41,10 +40,13 @@ export default function WriteScreen() {
 
   const { data, isLoading, isError, error, refetch } = useSentences(partNum);
   const [idx, setIdx] = useState(0);
-  const [picked, setPicked] = useState<number[]>([]); // indices into choices
+  const [picked, setPicked] = useState<number[]>([]);
   const [checked, setChecked] = useState(false);
+  const [showHint, setShowHint] = useState(false);
 
-  // Distractor pool = all tokens across this part's items.
+  const toggleSentence = useBookmarks((s) => s.toggleSentence);
+  const hasSentence = useBookmarks((s) => s.hasSentence);
+
   const pool = useMemo(
     () => Array.from(new Set((data ?? []).flatMap((s) => s.tokens))),
     [data],
@@ -61,7 +63,10 @@ export default function WriteScreen() {
   if (!cur) return <EmptyView message="문장 데이터가 없습니다." />;
 
   const attempt = picked.map((i) => choices[i]);
-  const isCorrect = attempt.length === cur.tokens.length && attempt.every((t, i) => norm(t) === norm(cur.tokens[i]));
+  const isCorrect =
+    attempt.length === cur.tokens.length &&
+    attempt.every((t, i) => norm(t) === norm(cur.tokens[i]));
+  const isFav = hasSentence(cur.id);
 
   function pick(i: number) {
     if (checked) return;
@@ -74,15 +79,21 @@ export default function WriteScreen() {
   function next() {
     setChecked(false);
     setPicked([]);
+    setShowHint(false);
     setIdx((i) => i + 1);
   }
-  // TTS uses an external (network) endpoint — swallow failures (offline/blocked)
-  // so a tap never throws an unhandled promise rejection.
+  function goPrev() {
+    if (idx === 0) return;
+    setChecked(false);
+    setPicked([]);
+    setShowHint(false);
+    setIdx((i) => Math.max(0, i - 1));
+  }
   async function speak(text: string) {
     try {
       await play(tts(text));
     } catch {
-      // best-effort playback; silent when unavailable
+      // best-effort
     }
   }
 
@@ -94,7 +105,15 @@ export default function WriteScreen() {
         <Text style={styles.hint}>{cur.translationKo}</Text>
         <Text style={styles.prompt}>{cur.prompt}</Text>
 
-        {/* 선택한 단어 / chosen words */}
+        {/* 힌트 패널 */}
+        {showHint && (
+          <View style={styles.hintBox}>
+            <Text style={styles.hintBoxLabel}>💡 힌트</Text>
+            <Text style={styles.hintBoxText}>{cur.fullSentence}</Text>
+          </View>
+        )}
+
+        {/* 선택한 단어 */}
         <View style={styles.answerRow}>
           {attempt.length === 0 ? (
             <Text style={styles.answerPlaceholder}>아래에서 단어를 골라 문장을 완성하세요</Text>
@@ -138,16 +157,38 @@ export default function WriteScreen() {
         )}
       </View>
 
-      {!checked ? (
-        <PrimaryButton
-          label="확인"
-          disabled={picked.length === 0}
-          onPress={() => setChecked(true)}
-          style={{ marginTop: spacing.lg }}
-        />
-      ) : (
-        <PrimaryButton label="다음" onPress={next} style={{ marginTop: spacing.lg }} />
-      )}
+      {/* 툴바: 이전 | 힌트 | 북마크 | 확인/다음 */}
+      <View style={styles.toolbar}>
+        <Pressable
+          style={[styles.iconBtn, idx === 0 && styles.iconBtnDisabled]}
+          onPress={goPrev}
+          disabled={idx === 0}
+        >
+          <Text style={styles.iconBtnText}>‹</Text>
+        </Pressable>
+
+        <Pressable
+          style={[styles.iconBtn, showHint && styles.iconBtnActive]}
+          onPress={() => setShowHint((h) => !h)}
+        >
+          <Text style={styles.iconBtnText}>💡</Text>
+        </Pressable>
+
+        <Pressable style={styles.iconBtn} onPress={() => toggleSentence(cur)}>
+          <Text style={styles.iconBtnText}>{isFav ? "🔖" : "🏷"}</Text>
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.confirmBtn,
+            !checked && picked.length === 0 && styles.confirmBtnDisabled,
+          ]}
+          disabled={!checked && picked.length === 0}
+          onPress={!checked ? () => setChecked(true) : next}
+        >
+          <Text style={styles.confirmBtnText}>{!checked ? "확인" : "다음 ›"}</Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
@@ -172,6 +213,14 @@ const styles = StyleSheet.create({
   },
   hint: { color: INK_MUTED, fontSize: fontSize.md },
   prompt: { color: INK, fontSize: fontSize.xl, fontWeight: "700", lineHeight: 30 },
+  hintBox: {
+    backgroundColor: "#fef9c3",
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  hintBoxLabel: { color: "#854d0e", fontSize: fontSize.sm, fontWeight: "700" },
+  hintBoxText: { color: "#713f12", fontSize: fontSize.md, lineHeight: 24 },
   answerRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -206,9 +255,42 @@ const styles = StyleSheet.create({
   shadowRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   fullSentence: { flex: 1, color: INK, fontSize: fontSize.md, fontWeight: "700", lineHeight: 26 },
   ttsBtn: {
-    width: 36, height: 36, borderRadius: radius.pill,
-    backgroundColor: "#f1f5f9", alignItems: "center", justifyContent: "center",
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
   },
   ttsIcon: { fontSize: 18 },
   shadowHint: { color: INK_MUTED, fontSize: fontSize.sm },
+  toolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  iconBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.bgCard,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconBtnDisabled: { opacity: 0.35 },
+  iconBtnActive: { borderColor: colors.accent, backgroundColor: "#0c2d40" },
+  iconBtnText: { fontSize: 20 },
+  confirmBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmBtnDisabled: { opacity: 0.5 },
+  confirmBtnText: { color: colors.bg, fontWeight: "700", fontSize: fontSize.base },
 });

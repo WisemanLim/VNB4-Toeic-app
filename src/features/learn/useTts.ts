@@ -9,12 +9,21 @@ import { useEffect, useRef } from "react";
 export function useTts() {
   const soundRef = useRef<Audio.Sound | null>(null);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // iOS honors the hardware mute switch by default, so playback is silent
+    // on a muted device. Opt into playing in silent mode (and ducking other
+    // audio) so the pronunciation/shadowing clips are always audible.
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: true,
+    }).catch(() => {
+      // best-effort; playback still works when the device isn't muted
+    });
+
+    return () => {
       soundRef.current?.unloadAsync();
-    },
-    [],
-  );
+    };
+  }, []);
 
   async function play(url?: string) {
     if (!url) return;

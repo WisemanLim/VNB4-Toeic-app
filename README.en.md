@@ -13,10 +13,11 @@ TOEIC vocab mobile app — React Native 0.74 + Expo SDK 51.
 
 - **홈 (Home)** [`app/index.tsx`] — split into top/bottom halves.
   - Top: **취약유형결과 (weak-type analysis)** donut chart — guest (not yet studied) = empty gray track + "Check after test"; logged in = server analysis LC/RC **correct/incorrect 4-way split** — [`src/features/home/ScoreDonut.tsx`]
-  - Bottom: review-start card + **LC (Part 1–4) / RC (Part 5–7)** two-section part grid (entering a card studies **all words** for that part) + **문장쓰기·쉐도잉 (sentence writing / shadowing)** section (Part 1–4). Guest/login auth bar at the top.
-- **학습 카드 (Learning card)** [`app/learn/[lessonId].tsx`] — top illustration image (falls back to picsum if no `imageUrl` → server words always shown too) → POS (noun/verb…, free-string label map) → word + TTS → IPA / Korean pronunciation → locale chips (US/GB/AU) → (tap) meaning → example sentence (target bolded) + TTS → sentence translation. Bottom circular toolbar (previous / don't know / favorite / next).
-- **문장쓰기·쉐도잉 (sentence writing / shadowing)** [`app/write/[part].tsx`] — Korean hint → pick word chips to complete the sentence → confirm → answer + full sentence 🔊 (shadowing). `useSentences(part)` → `/sentences`.
-- **로그인 / 회원가입 (Login / Sign up)** [`app/login.tsx` · `app/signup.tsx`] — email + password. Home top auth bar (guest CTA ↔ user + logout). `AuthProvider` / `useAuth` in `src/core/auth.tsx`.
+  - Bottom: review-start card + **Bookmarks** card + **LC (Part 1–4) / RC (Part 5–7)** two-section part grid (entering a card studies **all words** for that part) + **sentence writing / shadowing** section (Part 1–4). Guest/login auth bar at the top.
+- **Learning card** [`app/learn/[lessonId].tsx`] — top image fetched via loremflickr keyword search (word-relevant images; uses `imageUrl` from backend when present) → POS (noun/verb…, free-string label map) → word + TTS → IPA / Korean pronunciation → locale chips (US/GB/AU) → (tap) meaning → example sentence (target bolded) + TTS → sentence translation. Bottom toolbar (previous / don't know / bookmark / next). **Left/right swipe gestures**: swipe right = previous, swipe left = "I know this" (next). **Progress is preserved**: returning to the screen after navigating away resumes from the same word. A "Restart" button appears on completion.
+- **Sentence writing / shadowing** [`app/write/[part].tsx`] — Korean hint → pick word chips to complete the sentence. Bottom toolbar: **Previous (‹)** · **Hint (💡, reveals the full sentence)** · **Bookmark (🔖/🏷)** · Confirm / Next. After confirming, shows answer + full sentence 🔊 (shadowing). `useSentences(part)` → `/sentences`.
+- **Bookmarks** [`app/bookmarks.tsx`] — view all **words and sentences** saved from the learning card and sentence-writing screens. Backed by the zustand `useBookmarks` store (persists for the session).
+- **Login / Sign up** [`app/login.tsx` · `app/signup.tsx`] — email + password. Home top auth bar (guest CTA ↔ user + logout). `AuthProvider` / `useAuth` in `src/core/auth.tsx`.
 
 ## PRD module mapping
 
@@ -28,7 +29,10 @@ TOEIC vocab mobile app — React Native 0.74 + Expo SDK 51.
 | §1.3 Progress/stats (weak-type donut) | `app/index.tsx` + `src/features/home/ScoreDonut.tsx` (`/me/analysis`) |
 | 문장쓰기 (sentence writing, word picking) / shadowing | `app/write/[part].tsx` (`/sentences`, Part 1–4) |
 | Studying all words per part | `app/learn/part-N` → `useLearnQueue` paginates `/words?part=N` (all words, not a 20 limit) |
-| §1.3 Notes / favorites | Learning card bookmark (local state, persistence in M5) |
+| §1.3 Notes / favorites | `src/store/bookmarks.ts` (word & sentence bookmarks, session-persistent) + `app/bookmarks.tsx` (collection view) |
+| Resume learning | `src/store/learnProgress.ts` — stores idx per lessonId; restored on navigation return |
+| Left/right swipe gestures | `app/learn/[lessonId].tsx` PanResponder — right = previous, left = "I know" (next) |
+| Sentence writing hint / prev / bookmark | `app/write/[part].tsx` toolbar — 💡 hint (full sentence) · ‹ previous · 🏷 bookmark |
 | §1.3 Auth (Email + OAuth) | `app/login.tsx` |
 | §2.1 Words per part (all parts offline) | `assets/seed/words.json` (scripts/gen-seed.mjs) |
 | §7 Offline 24h cache | `app/_layout.tsx` TanStack Query `staleTime`/`gcTime` (implemented) |
@@ -49,6 +53,9 @@ src/
   features/
     home/ScoreDonut.tsx  # weak-type donut chart (react-native-svg)
     learn/useTts.ts      # expo-av playback hook
+  store/
+    bookmarks.ts        # word & sentence bookmark store (zustand, session-persistent)
+    learnProgress.ts    # learn progress (lessonId→idx) store (zustand, session-persistent)
   ui.tsx          # shared components (Loading/Empty/Error/PrimaryButton)
   theme.ts        # design tokens
 app/              # Expo Router screens (file-based routing)

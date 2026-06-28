@@ -13,9 +13,10 @@ TOEIC vocab 모바일 앱 — React Native 0.74 + Expo SDK 51.
 
 - **홈** [`app/index.tsx`] — 상/하 2분할.
   - 상단: **취약유형결과** 도넛 차트 — 게스트(미학습)=빈 회색 트랙 + "테스트 후 확인", 로그인=서버 분석 LC/RC **정답·오답 4분할** — [`src/features/home/ScoreDonut.tsx`]
-  - 하단: 복습 시작 카드 + **LC(Part 1–4) / RC(Part 5–7)** 2섹션 파트 그리드(카드 진입 시 해당 파트 **전체 단어** 학습) + **문장쓰기·쉐도잉** 섹션(Part 1–4). 상단에 게스트/로그인 인증 바.
-- **학습 카드** [`app/learn/[lessonId].tsx`] — 상단 일러스트 이미지(`imageUrl` 없으면 picsum 폴백 → 서버 단어도 항상 표시) → POS(명사/동사…, 자유 문자열 라벨맵) → 단어+TTS → IPA·한글발음 → 로케일 칩(US/GB/AU) → (탭) 뜻 → 예문(타겟 굵게)+TTS → 예문번역. 하단 원형 툴바(이전/모름/즐겨찾기/다음).
-- **문장쓰기·쉐도잉** [`app/write/[part].tsx`] — 한글 힌트 → 단어칩 골라 문장 완성 → 확인 → 정답 + 전체문장 🔊(쉐도잉). `useSentences(part)` → `/sentences`.
+  - 하단: 복습 시작 카드 + **북마크 모아보기** 카드 + **LC(Part 1–4) / RC(Part 5–7)** 2섹션 파트 그리드(카드 진입 시 해당 파트 **전체 단어** 학습) + **문장쓰기·쉐도잉** 섹션(Part 1–4). 상단에 게스트/로그인 인증 바.
+- **학습 카드** [`app/learn/[lessonId].tsx`] — 상단 이미지(단어 키워드로 loremflickr 검색 → 단어 관련 이미지, `imageUrl` 있으면 우선) → POS(명사/동사…, 자유 문자열 라벨맵) → 단어+TTS → IPA·한글발음 → 로케일 칩(US/GB/AU) → (탭) 뜻 → 예문(타겟 굵게)+TTS → 예문번역. 하단 원형 툴바(이전/모름/북마크/다음). **좌우 스와이프 제스처** 지원(오른쪽=이전, 왼쪽=알아요). **진행 위치 유지**: 다른 화면 이동 후 복귀해도 같은 단어에서 이어 학습. 완료 시 "다시 시작" 버튼.
+- **문장쓰기·쉐도잉** [`app/write/[part].tsx`] — 한글 힌트 → 단어칩 골라 문장 완성. 하단 툴바: **이전(‹)** · **힌트(💡, 정답 문장 표시)** · **북마크(🔖/🏷)** · 확인/다음. 정답 확인 후 TTS 🔊 + 쉐도잉. `useSentences(part)` → `/sentences`.
+- **북마크 모아보기** [`app/bookmarks.tsx`] — 학습 카드·문장쓰기에서 저장한 **단어·문장**을 한 화면에서 확인. zustand `useBookmarks` 스토어(세션 내 영속).
 - **로그인 / 회원가입** [`app/login.tsx` · `app/signup.tsx`] — 이메일+비밀번호. 홈 상단 인증 바(게스트 CTA ↔ 사용자+로그아웃). `src/core/auth.tsx` 의 `AuthProvider`/`useAuth`.
 
 ## PRD module mapping
@@ -28,7 +29,10 @@ TOEIC vocab 모바일 앱 — React Native 0.74 + Expo SDK 51.
 | §1.3 진도/통계 (취약유형 도넛) | `app/index.tsx` + `src/features/home/ScoreDonut.tsx` (`/me/analysis`) |
 | 문장쓰기(단어 고르기)·쉐도잉 | `app/write/[part].tsx` (`/sentences`, Part 1–4) |
 | 파트별 전체 단어 학습 | `app/learn/part-N` → `useLearnQueue` 가 `/words?part=N` 페이지네이션(전체 단어, 20 제한 아님) |
-| §1.3 노트/즐겨찾기 | 학습 카드 북마크 (로컬 state, 영속화 M5) |
+| §1.3 노트/즐겨찾기 | `src/store/bookmarks.ts` (단어·문장 북마크, 세션 영속) + `app/bookmarks.tsx` (모아보기) |
+| 학습 진행 이어하기 | `src/store/learnProgress.ts` — lessonId별 idx 저장, 네비게이션 복귀 시 복원 |
+| 좌우 스와이프 제스처 | `app/learn/[lessonId].tsx` PanResponder — 오른쪽=이전, 왼쪽=알아요(다음) |
+| 문장쓰기 힌트/이전/북마크 | `app/write/[part].tsx` 툴바 — 💡 힌트(정답 문장) · ‹ 이전 · 🏷 북마크 |
 | §1.3 인증 (Email + OAuth) | `app/login.tsx` |
 | §2.1 파트별 단어 (오프라인 전 파트) | `assets/seed/words.json` (scripts/gen-seed.mjs) |
 | §7 오프라인 24h 캐시 | `app/_layout.tsx` TanStack Query `staleTime`/`gcTime` (구현됨) |
@@ -49,6 +53,9 @@ src/
   features/
     home/ScoreDonut.tsx  # 취약유형 도넛 차트 (react-native-svg)
     learn/useTts.ts      # expo-av 재생 훅
+  store/
+    bookmarks.ts        # 단어·문장 북마크 스토어 (zustand, 세션 내 영속)
+    learnProgress.ts    # 학습 진행 위치(lessonId→idx) 스토어 (zustand, 세션 내 영속)
   ui.tsx          # 공용 컴포넌트 (Loading/Empty/Error/PrimaryButton)
   theme.ts        # 디자인 토큰
 app/              # Expo Router 화면 (파일 기반 라우팅)

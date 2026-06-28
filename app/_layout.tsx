@@ -41,6 +41,7 @@ export default function RootLayout() {
               <Stack.Screen name="signup" options={{ title: "회원가입" }} />
               <Stack.Screen name="learn/[lessonId]" options={{ title: "학습" }} />
               <Stack.Screen name="write/[part]" options={{ title: "문장쓰기 · 쉐도잉" }} />
+              <Stack.Screen name="bookmarks" options={{ title: "북마크 모아보기" }} />
             </Stack>
           </AuthProvider>
         </QueryClientProvider>
